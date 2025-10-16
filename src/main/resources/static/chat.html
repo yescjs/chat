@@ -8,29 +8,42 @@
 </head>
 <body>
     <h1>Simple WebSocket Chat</h1>
+    <input type="text" id="roomId" placeholder="방 ID 입력" />
     <input type="text" id="sender" placeholder="닉네임" />
     <input type="text" id="message" placeholder="메시지" />
+    <button onclick="connect()">방 접속</button>
     <button onclick="sendMessage()">전송</button>
     <ul id="chat"></ul>
 
     <script>
-        const socket = new SockJS('/ws/chat');
-        const stompClient = Stomp.over(socket);
+        let stompClient = null;
+        let currentRoom = null;
 
-        stompClient.connect({}, function () {
-            console.log('Connected');
-            stompClient.subscribe('/topic/messages', function (msg) {
-                const chat = JSON.parse(msg.body);
-                const li = document.createElement('li');
-                li.textContent = chat.sender + ": " + chat.message;
-                document.getElementById('chat').appendChild(li);
+        function connect() {
+            const socket = new SockJS('/ws/chat');
+            stompClient = Stomp.over(socket);
+            const roomId = parseInt(document.getElementById('roomId').value, 10);
+            currentRoom = roomId;
+
+            stompClient.connect({}, () => {
+                stompClient.subscribe(`/topic/chatroom/${roomId}`, (msg) => {
+                    const chat = JSON.parse(msg.body);
+                    const li = document.createElement('li');
+                    li.textContent = `${chat.sender}: ${chat.message}`;
+                    document.getElementById('chat').appendChild(li);
+                });
             });
-        });
+        }
 
         function sendMessage() {
             const sender = document.getElementById('sender').value;
             const message = document.getElementById('message').value;
-            stompClient.send("/app/chat", {}, JSON.stringify({sender, message}));
+
+            stompClient.send(`/app/chatroom/${currentRoom}`, {}, JSON.stringify({
+                sender: sender,
+                message: message,
+                roomId: currentRoom
+            }));
         }
     </script>
 </body>
