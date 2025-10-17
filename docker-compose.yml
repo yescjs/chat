@@ -1,5 +1,28 @@
 version: '3.8'
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: chat-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: chatdb
+      MYSQL_USER: chatuser
+      MYSQL_PASSWORD: chatpassword
+    ports:
+      - "3306:3306"
+    command: [
+      "mysqld",
+      "--default-authentication-plugin=mysql_native_password",
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_unicode_ci",
+      "--skip-log-bin"
+    ]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpass || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   redis:
     image: redis:latest
     container_name: my-redis
@@ -12,10 +35,16 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/chatdb
+      SPRING_DATASOURCE_USERNAME: chatuser
+      SPRING_DATASOURCE_PASSWORD: chatpassword
       SPRING_REDIS_HOST: redis
       SERVER_PORT: 8080
     depends_on:
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   app2:
     build: .
@@ -23,7 +52,13 @@ services:
     ports:
       - "8081:8081"
     environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/chatdb
+      SPRING_DATASOURCE_USERNAME: chatuser
+      SPRING_DATASOURCE_PASSWORD: chatpassword
       SPRING_REDIS_HOST: redis
       SERVER_PORT: 8081
     depends_on:
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
